@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WaterKing QR System</title>
+    
+    <!-- CDN Dependencies -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+
+    <!-- Tailwind Config for Custom Theme -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'San Francisco', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'sans-serif'],
+                    },
+                    colors: {
+                        glass: {
+                            100: 'rgba(255, 255, 255, 0.1)',
+                            200: 'rgba(255, 255, 255, 0.05)',
+                            300: 'rgba(0, 0, 0, 0.2)',
+                        },
+                        apple: {
+                            bg: '#000000',
+                            card: '#1c1c1e',
+                            blue: '#0a84ff',
+                            green: '#30d158',
+                            red: '#ff453a',
+                            gray: '#8e8e93'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.4s ease-out forwards',
+                        'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom Styles & Scrollbar */
+        html, body {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior-y: none;
+        }
+
+        body {
+            background-color: #000000;
+            background-image: radial-gradient(circle at top right, #1a2a42 0%, #000000 40%),
+                              radial-gradient(circle at bottom left, #0d1b2a 0%, #000000 40%);
+            background-attachment: fixed;
+            color: #ffffff;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+        .glass-card {
+            background: rgba(28, 28, 30, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+
+        /* Print Style for QR Code */
+        @media print {
+            body * { visibility: hidden; }
+            #printable-qr-area, #printable-qr-area * { visibility: visible; }
+            #printable-qr-area {
+                position: absolute;
+                left: 0; top: 0; width: 100%; height: auto;
+                display: grid !important;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
+                padding-top: 1cm;
+                align-items: start;
+                justify-items: center;
+            }
+            .qr-card-print {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                margin-bottom: 20px;
+            }
+            .no-print { display: none !important; }
+        }
+
+        /* Toast Animation */
+        .toast-enter { transform: translateY(-100%); opacity: 0; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .toast-show { transform: translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-sm md:text-base selection:bg-apple-blue selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 left-0 right-0 z-50 flex flex-col items-center gap-2 pointer-events-none px-4"></div>
+
+    <!-- Mobile Bottom Navigation (Hidden on Desktop) -->
+    <nav class="md:hidden fixed bottom-6 left-4 right-4 glass-card rounded-3xl border border-white/10 z-40 shadow-2xl backdrop-blur-2xl bg-black/40 pb-0">
+        <div class="flex justify-around items-center h-[70px] px-2 relative">
+            <button onclick="switchTab('dashboard')" class="nav-btn flex flex-col items-center p-2 text-apple-gray active-nav transition-colors" data-target="dashboard">
+                <i data-lucide="layout-dashboard" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Beranda</span>
+            </button>
+            <button onclick="switchTab('generate')" class="nav-btn flex flex-col items-center p-2 text-apple-gray transition-colors" data-target="generate">
+                <i data-lucide="qr-code" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Buat QR</span>
+            </button>
+            <button onclick="switchTab('scan')" class="nav-btn flex flex-col items-center p-2 text-apple-gray transition-colors" data-target="scan">
+                <div class="bg-apple-blue text-white p-3.5 rounded-full -mt-8 shadow-lg shadow-blue-500/40 border border-blue-400/30">
+                    <i data-lucide="scan" class="w-6 h-6"></i>
+                </div>
+                <span class="text-[10px] font-medium mt-1">Scan</span>
+            </button>
+            <button onclick="switchTab('history')" class="nav-btn flex flex-col items-center p-2 text-apple-gray transition-colors" data-target="history">
+                <i data-lucide="clock" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Histori</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Desktop Sidebar (Hidden on Mobile) -->
+    <aside class="hidden md:flex flex-col w-64 glass-card border-r border-white/10 h-full z-40 relative">
+        <div class="p-6 flex items-center gap-3">
+            <div class="bg-gradient-to-br from-blue-400 to-apple-blue p-2 rounded-xl shadow-lg">
+                <i data-lucide="droplets" class="text-white w-6 h-6"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-wide text-white">WaterKing</h1>
+                <p class="text-xs text-apple-gray">QR System Pesantren</p>
+            </div>
+        </div>
+        
+        <nav class="flex-1 px-4 mt-6 space-y-2">
+            <button onclick="switchTab('dashboard')" class="nav-btn-desktop w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-white bg-white/10 shadow-sm transition-all" data-target="dashboard">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="font-medium">Dashboard</span>
+            </button>
+            <button onclick="switchTab('generate')" class="nav-btn-desktop w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-apple-gray hover:bg-white/5 transition-all" data-target="generate">
+                <i data-lucide="qr-code" class="w-5 h-5"></i>
+                <span class="font-medium">Generate QR</span>
+            </button>
+            <button onclick="switchTab('scan')" class="nav-btn-desktop w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-apple-gray hover:bg-white/5 transition-all" data-target="scan">
+                <i data-lucide="scan" class="w-5 h-5"></i>
+                <span class="font-medium">QR Scanner</span>
+            </button>
+            <button onclick="switchTab('history')" class="nav-btn-desktop w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-apple-gray hover:bg-white/5 transition-all" data-target="history">
+                <i data-lucide="clock" class="w-5 h-5"></i>
+                <span class="font-medium">Histori</span>
+            </button>
+        </nav>
+        
+        <div class="p-4 border-t border-white/10">
+            <p class="text-xs text-center text-apple-gray">© 2026 WaterKing</p>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 h-full overflow-y-auto pb-32 md:pb-0 relative scroll-smooth" style="-webkit-overflow-scrolling: touch;">
+        
+        <!-- ================= DASHBOARD TAB ================= -->
+        <section id="dashboard" class="tab-content active p-4 md:p-8 max-w-6xl mx-auto">
+            <header class="mb-8 animate-slide-up">
+                <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Ringkasan Hari Ini</h2>
+                <p class="text-apple-gray">Pantau aktivitas pengambilan air galon asrama.</p>
+            </header>
+
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 animate-slide-up" style="animation-delay: 0.1s;">
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all"></div>
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div class="p-3 bg-blue-500/20 text-apple-blue rounded-xl">
+                            <i data-lucide="home" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-apple-gray text-sm font-medium mb-1">Total Asrama</p>
+                            <h3 id="stat-total-dorms" class="text-3xl font-bold text-white">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-green-500/20 rounded-full blur-2xl group-hover:bg-green-500/30 transition-all"></div>
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div class="p-3 bg-green-500/20 text-apple-green rounded-xl">
+                            <i data-lucide="activity" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-apple-gray text-sm font-medium mb-1">Total Scan Hari Ini</p>
+                            <h3 id="stat-today-scans" class="text-3xl font-bold text-white">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card rounded-2xl p-5 relative overflow-hidden group">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-red-500/20 rounded-full blur-2xl group-hover:bg-red-500/30 transition-all"></div>
+                    <div class="flex items-center gap-4 relative z-10">
+                        <div class="p-3 bg-red-500/20 text-apple-red rounded-xl">
+                            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-apple-gray text-sm font-medium mb-1">Limit Tercapai</p>
+                            <h3 id="stat-limit-reached" class="text-3xl font-bold text-white">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="glass-card rounded-2xl p-5 animate-slide-up" style="animation-delay: 0.2s;">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-bold text-white">Aktivitas Terbaru</h3>
+                    <button onclick="switchTab('history')" class="text-sm text-apple-blue hover:text-blue-400 font-medium">Lihat Semua</button>
+                </div>
+                <div id="recent-activity-list" class="space-y-3">
+                    <!-- Dynamic list here -->
+                    <div class="text-center py-8 text-apple-gray text-sm">Belum ada aktivitas.</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= GENERATE QR TAB ================= -->
+        <section id="generate" class="tab-content p-4 md:p-8 max-w-5xl mx-auto">
+            <header class="mb-8">
+                <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Buat QR Asrama</h2>
+                <p class="text-apple-gray">Generate kartu QR unik secara single maupun bulk (massal).</p>
+            </header>
+
+            <!-- Mode Toggle -->
+            <div class="flex p-1 bg-white/5 rounded-xl border border-white/10 w-fit mb-8 relative z-10 mx-auto md:mx-0">
+                <button onclick="setGenMode('single')" id="btn-mode-single" class="px-6 py-2 rounded-lg text-sm font-bold bg-apple-blue text-white shadow-md transition-all">Single</button>
+                <button onclick="setGenMode('bulk')" id="btn-mode-bulk" class="px-6 py-2 rounded-lg text-sm font-medium text-apple-gray hover:text-white transition-all">Bulk (Massal)</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                <!-- Input Form Panel -->
+                <div class="md:col-span-4 glass-card rounded-2xl p-6 h-fit md:sticky md:top-4">
+                    
+                    <!-- Single Form -->
+                    <form id="generate-form" onsubmit="handleGenerateQR(event)">
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-apple-gray mb-2">Kode Asrama</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i data-lucide="building" class="text-apple-gray w-5 h-5"></i>
+                                </div>
+                                <input type="text" id="dorm-code-input" required placeholder="Contoh: A03" 
+                                       class="w-full pl-10 pr-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-apple-blue focus:ring-1 focus:ring-apple-blue transition-all uppercase">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-apple-blue hover:bg-blue-600 text-white font-medium py-3 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg shadow-blue-500/25">
+                            <i data-lucide="qr-code" class="w-5 h-5"></i>
+                            Generate QR
+                        </button>
+                    </form>
+
+                    <!-- Bulk Form -->
+                    <form id="generate-bulk-form" onsubmit="handleGenerateBulkQR(event)" class="hidden">
+                        <div class="mb-5">
+                            <label class="block text-sm font-medium text-apple-gray mb-2">Daftar Kode (Satu per baris)</label>
+                            <textarea id="bulk-code-input" required placeholder="A01&#10;A02&#10;A03" rows="6"
+                                      class="w-full p-4 bg-black/50 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-apple-blue focus:ring-1 focus:ring-apple-blue transition-all uppercase resize-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-apple-blue hover:bg-blue-600 text-white font-medium py-3 rounded-xl transition-colors flex justify-center items-center gap-2 shadow-lg shadow-blue-500/25">
+                            <i data-lucide="layers" class="w-5 h-5"></i>
+                            Generate Bulk
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Preview & Actions Panel -->
+                <div class="md:col-span-8 flex flex-col items-center justify-center w-full">
+                    
+                    <!-- Preview Container -->
+                    <div id="qr-preview-container" class="hidden flex-col items-center w-full animate-fade-in">
+                        
+                        <!-- Global Actions -->
+                        <div class="flex flex-wrap gap-3 w-full justify-end mb-6 no-print">
+                            <button onclick="printAllQR()" class="flex-1 md:flex-none bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium py-2.5 px-6 rounded-xl transition-colors flex justify-center items-center gap-2">
+                                <i data-lucide="printer" class="w-5 h-5"></i>
+                                Print
+                            </button>
+                            <button onclick="downloadAllQR()" class="flex-1 md:flex-none bg-white/10 hover:bg-white/20 border border-white/20 text-white font-medium py-2.5 px-6 rounded-xl transition-colors flex justify-center items-center gap-2">
+                                <i data-lucide="download" class="w-5 h-5"></i>
+                                PNG
+                            </button>
+                        </div>
+
+                        <!-- The Printable Grid Structure -->
+                        <div id="printable-qr-area" class="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-6">
+                            <!-- Cards will be injected here via JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="qr-empty-state" class="glass-card w-full aspect-video md:aspect-[2/1] rounded-2xl flex flex-col items-center justify-center text-apple-gray border border-dashed border-white/20">
+                        <i data-lucide="layout-grid" class="w-12 h-12 mb-3 opacity-50"></i>
+                        <p class="text-sm">Preview QR akan muncul di sini</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SCANNER TAB ================= -->
+        <section id="scan" class="tab-content h-full flex flex-col p-0 md:p-8">
+            <div class="flex-1 flex flex-col max-w-2xl mx-auto w-full h-full md:glass-card md:rounded-3xl md:overflow-hidden relative">
+                
+                <!-- Overlay Header -->
+                <div class="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/80 to-transparent flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Scanner WaterKing</h2>
+                        <p class="text-xs text-gray-300">Arahkan ke QR Asrama</p>
+                    </div>
+                    <div class="animate-pulse bg-red-500 w-3 h-3 rounded-full shadow-[0_0_10px_rgba(239,68,68,0.8)]" id="scanner-indicator"></div>
+                </div>
+
+                <!-- Scanner Viewport -->
+                <div class="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
+                    <div id="reader" class="w-full h-full min-h-[400px]"></div>
+                    
+                    <!-- Targeting Frame SVG Overlay (Pointer Events None) -->
+                    <div class="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+                         <div class="w-64 h-64 border-2 border-white/30 rounded-3xl relative">
+                             <!-- Corners -->
+                             <div class="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-apple-blue rounded-tl-3xl"></div>
+                             <div class="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-apple-blue rounded-tr-3xl"></div>
+                             <div class="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-apple-blue rounded-bl-3xl"></div>
+                             <div class="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-apple-blue rounded-br-3xl"></div>
+                             
+                             <!-- Scanning line animation -->
+                             <div class="w-full h-0.5 bg-apple-blue absolute top-0 left-0 shadow-[0_0_15px_#0a84ff] animate-[scan_2s_ease-in-out_infinite]"></div>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Scanner Controls / Info -->
+                <div class="p-6 glass-card border-t border-white/10 rounded-t-3xl -mt-6 z-20 md:mt-0 md:rounded-t-none">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-sm text-apple-gray font-medium">Status Kamera</p>
+                            <p id="cam-status" class="text-white font-bold">Menunggu Izin...</p>
+                        </div>
+                        <button id="btn-toggle-cam" onclick="toggleCamera()" class="bg-white/10 hover:bg-white/20 p-3 rounded-full transition-colors border border-white/10">
+                            <i data-lucide="camera-off" class="w-5 h-5" id="icon-cam"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <style>
+                @keyframes scan {
+                    0% { top: 0; opacity: 0; }
+                    10% { opacity: 1; }
+                    90% { opacity: 1; }
+                    100% { top: 100%; opacity: 0; }
+                }
+                /* Hide default html5-qrcode UI elements to look custom */
+                #reader__dashboard_section_csr span, 
+                #reader__dashboard_section_swaplink { color: white !important; font-family: inherit; }
+                #reader__dashboard_section_csr button { background: #0a84ff !important; color: white !important; border: none; padding: 8px 16px; border-radius: 8px; margin-top: 10px; }
+                #reader video { object-fit: cover; border-radius: 0; }
+                #reader { border: none !important; }
+            </style>
+        </section>
+
+        <!-- ================= HISTORY TAB ================= -->
+        <section id="history" class="tab-content p-4 md:p-8 max-w-6xl mx-auto">
+            <header class="mb-8 flex flex-col md:flex-row md:justify-between md:items-end gap-4">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-bold text-white mb-2">Histori Transaksi</h2>
+                    <p class="text-apple-gray">Catatan seluruh aktivitas scan galon.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="clearHistory()" class="bg-red-500/10 hover:bg-red-500/20 text-apple-red px-4 py-2 rounded-xl text-sm font-medium border border-red-500/20 transition-colors">
+                        Bersihkan Data
+                    </button>
+                </div>
+            </header>
+
+            <div class="glass-card rounded-2xl overflow-hidden shadow-2xl">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-white/5 border-b border-white/10">
+                                <th class="py-4 px-6 font-medium text-apple-gray text-sm">Asrama</th>
+                                <th class="py-4 px-6 font-medium text-apple-gray text-sm">Waktu & Tanggal</th>
+                                <th class="py-4 px-6 font-medium text-apple-gray text-sm">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-white/5">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination / Empty State -->
+                <div id="history-empty" class="hidden p-12 text-center flex flex-col items-center justify-center">
+                    <i data-lucide="database" class="w-12 h-12 text-apple-gray opacity-30 mb-4"></i>
+                    <p class="text-apple-gray">Belum ada data transaksi.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Detail Pembelian / Notifikasi Tengah (Opsional) -->
+    
+    <script>
+        // ==========================================
+        // 1. STATE & STORAGE MANAGEMENT
+        // ==========================================
+        const STORE_DORMS = 'wk_dorms';
+        const STORE_TX = 'wk_tx';
+
+        const Storage = {
+            getDorms: () => JSON.parse(localStorage.getItem(STORE_DORMS) || '[]'),
+            addDorm: (dormCode, token) => {
+                let dorms = Storage.getDorms();
+                let existing = dorms.find(d => d.code === dormCode);
+                if(!existing) {
+                    dorms.push({ code: dormCode, token: token, created_at: Date.now() });
+                    localStorage.setItem(STORE_DORMS, JSON.stringify(dorms));
+                    return { token, isNew: true };
+                }
+                return { token: existing.token, isNew: false };
+            },
+            getTx: () => JSON.parse(localStorage.getItem(STORE_TX) || '[]'),
+            addTx: (tx) => {
+                let txs = Storage.getTx();
+                txs.unshift(tx); // Add to beginning
+                localStorage.setItem(STORE_TX, JSON.stringify(txs));
+                updateDashboard();
+                renderHistory();
+            },
+            clearTx: () => {
+                localStorage.setItem(STORE_TX, '[]');
+                updateDashboard();
+                renderHistory();
+            }
+        };
+
+        // ==========================================
+        // 2. AUDIO & HAPTIC FEEDBACK API
+        // ==========================================
+        const AudioFX = {
+            ctx: null,
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            },
+            playTone(freq, type, duration, vol=0.1) {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            },
+            success() {
+                this.playTone(880, 'sine', 0.1, 0.2); // A5
+                setTimeout(() => this.playTone(1760, 'sine', 0.2, 0.2), 100); // A6
+                if(navigator.vibrate) navigator.vibrate([50, 50, 100]);
+            },
+            error() {
+                this.playTone(300, 'sawtooth', 0.2, 0.2);
+                setTimeout(() => this.playTone(250, 'sawtooth', 0.4, 0.3), 200);
+                if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            }
+        };
+
+        // ==========================================
+        // 3. UI/UX CONTROLS (TABS & TOAST)
+        // ==========================================
+        let currentTab = 'dashboard';
+        
+        function switchTab(tabId) {
+            currentTab = tabId;
+            
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            // Show target content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update mobile nav UI
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                const isTarget = el.dataset.target === tabId;
+                el.classList.toggle('text-white', isTarget);
+                el.classList.toggle('text-apple-gray', !isTarget);
+                
+                // Specific styling for center scan button
+                if(el.dataset.target === 'scan') {
+                    const iconBg = el.querySelector('div');
+                    if(isTarget) {
+                        iconBg.classList.add('shadow-[0_0_20px_#0a84ff]');
+                    } else {
+                        iconBg.classList.remove('shadow-[0_0_20px_#0a84ff]');
+                    }
+                }
+            });
+
+            // Update desktop nav UI
+            document.querySelectorAll('.nav-btn-desktop').forEach(el => {
+                const isTarget = el.dataset.target === tabId;
+                if(isTarget) {
+                    el.classList.add('text-white', 'bg-white/10', 'shadow-sm');
+                    el.classList.remove('text-apple-gray', 'hover:bg-white/5');
+                } else {
+                    el.classList.remove('text-white', 'bg-white/10', 'shadow-sm');
+                    el.classList.add('text-apple-gray', 'hover:bg-white/5');
+                }
+            });
+
+            // Camera logic: stop if not in scan tab
+            if (tabId !== 'scan') {
+                stopScanner();
+            } else {
+                // Initialize scan if switching to it, add a tiny delay for CSS transition
+                setTimeout(initScanner, 300);
+            }
+
+            // Re-render icons for dynamic content if needed
+            lucide.createIcons();
+        }
+
+        function showToast(title, message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const isSuccess = type === 'success';
+            const bgColor = isSuccess ? 'bg-apple-card' : 'bg-red-900/90';
+            const borderColor = isSuccess ? 'border-green-500/30' : 'border-red-500/50';
+            const iconColor = isSuccess ? 'text-apple-green' : 'text-white';
+            const iconName = isSuccess ? 'check-circle-2' : 'alert-octagon';
+            
+            toast.className = `toast-enter ${bgColor} backdrop-blur-xl border ${borderColor} shadow-2xl rounded-2xl p-4 flex items-center gap-4 w-[90%] md:w-96 mb-2 pointer-events-auto`;
+            toast.innerHTML = `
+                <div class="${isSuccess ? 'bg-green-500/20' : 'bg-white/20'} p-2 rounded-full">
+                    <i data-lucide="${iconName}" class="${iconColor} w-6 h-6"></i>
+                </div>
+                <div>
+                    <h4 class="font-bold text-white text-sm">${title}</h4>
+                    <p class="text-xs ${isSuccess ? 'text-gray-300' : 'text-red-100'}">${message}</p>
+                </div>
+            `;
+            
+            container.appendChild(toast);
+            lucide.createIcons();
+            
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.add('toast-show');
+            });
+
+            // Remove after 3s
+            setTimeout(() => {
+                toast.classList.remove('toast-show');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // ==========================================
+        // 4. DASHBOARD LOGIC
+        // ==========================================
+        function updateDashboard() {
+            const txs = Storage.getTx();
+            const dorms = Storage.getDorms();
+            const now = Date.now();
+            const startOfDay = new Date().setHours(0,0,0,0);
+            
+            // Basic Stats
+            document.getElementById('stat-total-dorms').innerText = dorms.length;
+            
+            const todayScans = txs.filter(t => t.timestamp >= startOfDay).length;
+            document.getElementById('stat-today-scans').innerText = todayScans;
+
+            const limitReached = txs.filter(t => t.timestamp >= startOfDay && t.status === 'REJECTED').length;
+            document.getElementById('stat-limit-reached').innerText = limitReached;
+
+            // Recent Activity (Top 5)
+            const recentContainer = document.getElementById('recent-activity-list');
+            const recentTxs = txs.slice(0, 5);
+            
+            if (recentTxs.length === 0) {
+                recentContainer.innerHTML = '<div class="text-center py-8 text-apple-gray text-sm">Belum ada aktivitas.</div>';
+            } else {
+                recentContainer.innerHTML = recentTxs.map(tx => {
+                    const isSuccess = tx.status === 'SUCCESS';
+                    const icon = isSuccess ? 'check' : 'x';
+                    const color = isSuccess ? 'green' : 'red';
+                    const timeStr = new Date(tx.timestamp).toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                    
+                    return `
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors border border-white/5">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2 bg-${color}-500/20 text-apple-${color} rounded-lg">
+                                <i data-lucide="${icon}" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold text-white uppercase text-sm">${tx.code}</p>
+                                <p class="text-xs text-apple-gray">${isSuccess ? 'Pengambilan Berhasil' : 'Limit Tercapai'}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-medium text-white">${timeStr}</p>
+                        </div>
+                    </div>`;
+                }).join('');
+                lucide.createIcons();
+            }
+        }
+
+        // ==========================================
+        // 5. GENERATE QR LOGIC
+        // ==========================================
+        let qrcodeInstances = []; // Store instances to manage them
+
+        // UI Toggle Single/Bulk
+        function setGenMode(mode) {
+            const btnSingle = document.getElementById('btn-mode-single');
+            const btnBulk = document.getElementById('btn-mode-bulk');
+            const formSingle = document.getElementById('generate-form');
+            const formBulk = document.getElementById('generate-bulk-form');
+
+            if (mode === 'single') {
+                btnSingle.className = 'px-6 py-2 rounded-lg text-sm font-bold bg-apple-blue text-white shadow-md transition-all';
+                btnBulk.className = 'px-6 py-2 rounded-lg text-sm font-medium text-apple-gray hover:text-white transition-all';
+                formSingle.classList.remove('hidden');
+                formBulk.classList.add('hidden');
+            } else {
+                btnBulk.className = 'px-6 py-2 rounded-lg text-sm font-bold bg-apple-blue text-white shadow-md transition-all';
+                btnSingle.className = 'px-6 py-2 rounded-lg text-sm font-medium text-apple-gray hover:text-white transition-all';
+                formBulk.classList.remove('hidden');
+                formSingle.classList.add('hidden');
+            }
+        }
+
+        // Render Card Helper
+        function createCardDOM(container, dormCode, token, isNew) {
+            const cardId = `qr-target-${Math.random().toString(36).substr(2, 9)}`;
+            const qrData = JSON.stringify({ c: dormCode, t: token });
+
+            const div = document.createElement('div');
+            div.className = "bg-white rounded-2xl p-5 text-black shadow-2xl border-4 border-gray-100 flex flex-col items-center relative overflow-hidden qr-card-print w-full max-w-[260px] mx-auto";
+            
+            let duplicateBadge = '';
+            if(!isNew) {
+                duplicateBadge = `<div class="absolute top-2 right-2 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-2 py-1 rounded-full border border-yellow-300 z-10 shadow-sm uppercase tracking-widest">Sudah Ada</div>`;
+            }
+
+            div.innerHTML = `
+                ${duplicateBadge}
+                <!-- Top Accent -->
+                <div class="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
+                
+                <h2 class="text-xl font-black tracking-tighter text-slate-800 mb-1 flex items-center gap-1 mt-1">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    WATERKING
+                </h2>
+                <p class="text-[10px] font-bold text-gray-400 tracking-widest uppercase mb-4 border-b border-gray-200 pb-2 w-full text-center">Sistem Galon</p>
+                
+                <!-- QR Target -->
+                <div id="${cardId}" class="bg-white p-2 rounded-xl shadow-inner border border-gray-100 mb-4" data-code="${dormCode}"></div>
+                
+                <div class="w-full text-center bg-gray-50 py-2 rounded-xl border border-gray-100">
+                    <p class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold mb-0.5">KODE ASRAMA</p>
+                    <p class="text-3xl font-black text-blue-600 leading-none">${dormCode}</p>
+                </div>
+            `;
+            container.appendChild(div);
+
+            const qrcode = new QRCode(document.getElementById(cardId), {
+                text: qrData,
+                width: 140,
+                height: 140,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+            qrcodeInstances.push(qrcode);
+        }
+
+        function prepareQRContainer() {
+            document.getElementById('qr-empty-state').classList.add('hidden');
+            document.getElementById('qr-preview-container').classList.remove('hidden');
+            const container = document.getElementById('printable-qr-area');
+            container.innerHTML = '';
+            qrcodeInstances = [];
+            return container;
+        }
+
+        // Single Generate
+        function handleGenerateQR(e) {
+            e.preventDefault();
+            const codeInput = document.getElementById('dorm-code-input');
+            let dormCode = codeInput.value.trim().toUpperCase();
+            
+            if(!dormCode) return;
+
+            const tempToken = Math.random().toString(36).substr(2, 9);
+            const result = Storage.addDorm(dormCode, tempToken);
+            
+            const container = prepareQRContainer();
+            createCardDOM(container, dormCode, result.token, result.isNew);
+
+            updateDashboard();
+            codeInput.value = '';
+            showToast('QR Dibuat', `Kartu asrama ${dormCode} siap dicetak.`, 'success');
+        }
+
+        // Bulk Generate (Lazy Load Rendering)
+        function handleGenerateBulkQR(e) {
+            e.preventDefault();
+            const textInput = document.getElementById('bulk-code-input');
+            const lines = textInput.value.split('\n');
+            const codes = [...new Set(lines.map(l => l.trim().toUpperCase()).filter(l => l !== ''))]; 
+
+            if(codes.length === 0) return;
+
+            const container = prepareQRContainer();
+            let index = 0;
+            let newCount = 0;
+            let dupCount = 0;
+
+            // Chunk rendering to avoid browser freeze
+            function processChunk() {
+                const limit = Math.min(index + 5, codes.length);
+                for (; index < limit; index++) {
+                    const dormCode = codes[index];
+                    const tempToken = Math.random().toString(36).substr(2, 9);
+                    const result = Storage.addDorm(dormCode, tempToken);
+                    
+                    if (result.isNew) newCount++;
+                    else dupCount++;
+
+                    createCardDOM(container, dormCode, result.token, result.isNew);
+                }
+
+                if (index < codes.length) {
+                    setTimeout(processChunk, 50);
+                } else {
+                    updateDashboard();
+                    textInput.value = '';
+                    showToast('Bulk Generate Selesai', `Baru: ${newCount}, Sudah Ada: ${dupCount}`, 'success');
+                }
+            }
+
+            processChunk();
+        }
+
+        function printAllQR() {
+            window.print();
+        }
+
+        function downloadAllQR() {
+            const canvases = document.querySelectorAll('#printable-qr-area canvas');
+            if (canvases.length === 0) {
+                showToast('Error', 'Tidak ada QR untuk didownload', 'error');
+                return;
+            }
+
+            showToast('Mendownload', `Memproses ${canvases.length} gambar...`, 'success');
+            
+            let index = 0;
+            // Delay for each download to prevent browser rate-limit
+            function dlNext() {
+                if (index >= canvases.length) return;
+                
+                const canvas = canvases[index];
+                const codeNode = canvas.parentElement; 
+                const code = codeNode.getAttribute('data-code') || `QR_${index}`;
+
+                const image = canvas.toDataURL("image/png");
+                const link = document.createElement('a');
+                link.href = image;
+                link.download = `QR_WATERKING_${code}.png`;
+                link.click();
+
+                index++;
+                setTimeout(dlNext, 300);
+            }
+            dlNext();
+        }
+
+        // ==========================================
+        // 6. QR SCANNER & 24H LIMIT LOGIC
+        // ==========================================
+        let html5QrcodeScanner = null;
+        let isScanning = false;
+        let lastScanData = null;
+        let lastScanTime = 0;
+
+        function check24HLimit(dormCode) {
+            const txs = Storage.getTx();
+            const now = Date.now();
+            const twentyFourHours = 24 * 60 * 60 * 1000;
+            
+            // Count successful txs in last 24 hours for this dorm
+            const recentTxs = txs.filter(tx => 
+                tx.code === dormCode && 
+                tx.status === 'SUCCESS' && 
+                (now - tx.timestamp) < twentyFourHours
+            );
+            
+            return recentTxs.length;
+        }
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Prevent multiple rapid scans
+            if (Date.now() - lastScanTime < 3000) return;
+            lastScanTime = Date.now();
+
+            try {
+                // Expecting JSON {"c":"A03","t":"xyz"}
+                const data = JSON.parse(decodedText);
+                const dormCode = data.c;
+                
+                if(!dormCode) throw new Error("Format tidak valid");
+
+                // Check limits
+                const currentUsage = check24HLimit(dormCode);
+                const limit = 2;
+
+                if (currentUsage < limit) {
+                    // SUCCESS
+                    AudioFX.success();
+                    Storage.addTx({
+                        code: dormCode,
+                        timestamp: Date.now(),
+                        status: 'SUCCESS'
+                    });
+                    showToast('Pembelian Berhasil', `Asrama ${dormCode} - Pengambilan ke-${currentUsage + 1} hari ini.`, 'success');
+                    
+                    // Visual feedback
+                    const viewport = document.querySelector('#reader');
+                    viewport.style.boxShadow = 'inset 0 0 50px rgba(48, 209, 88, 0.5)';
+                    setTimeout(() => viewport.style.boxShadow = 'none', 1000);
+
+                } else {
+                    // REJECTED
+                    AudioFX.error();
+                    Storage.addTx({
+                        code: dormCode,
+                        timestamp: Date.now(),
+                        status: 'REJECTED'
+                    });
+                    showToast('Limit Harian Tercapai!', `Asrama ${dormCode} sudah mengambil 2x dalam 24 jam terakhir.`, 'error');
+                    
+                    const viewport = document.querySelector('#reader');
+                    viewport.style.boxShadow = 'inset 0 0 50px rgba(255, 69, 58, 0.5)';
+                    setTimeout(() => viewport.style.boxShadow = 'none', 1000);
+                }
+
+            } catch (e) {
+                // Not JSON or invalid QR
+                AudioFX.error();
+                showToast('QR Tidak Dikenali', 'Pastikan scan QR resmi WaterKing.', 'error');
+            }
+        }
+
+        function initScanner() {
+            if (isScanning) return;
+            
+            document.getElementById('cam-status').innerText = "Memulai Kamera...";
+            document.getElementById('scanner-indicator').classList.add('animate-pulse', 'bg-red-500');
+            
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            html5QrcodeScanner.start({ facingMode: "environment" }, config, onScanSuccess)
+                .then(() => {
+                    isScanning = true;
+                    document.getElementById('cam-status').innerText = "Kamera Aktif";
+                    document.getElementById('cam-status').classList.replace('text-white', 'text-apple-green');
+                    document.getElementById('scanner-indicator').classList.replace('bg-red-500', 'bg-apple-green');
+                    document.getElementById('scanner-indicator').style.boxShadow = '0 0 10px rgba(48,209,88,0.8)';
+                    
+                    const icon = document.getElementById('icon-cam');
+                    icon.setAttribute('data-lucide', 'video');
+                    lucide.createIcons();
+                })
+                .catch((err) => {
+                    document.getElementById('cam-status').innerText = "Gagal Akses Kamera";
+                    document.getElementById('cam-status').classList.replace('text-apple-green', 'text-apple-red');
+                    showToast('Akses Kamera', 'Mohon izinkan akses kamera untuk scan QR', 'error');
+                });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner && isScanning) {
+                html5QrcodeScanner.stop().then(() => {
+                    isScanning = false;
+                    document.getElementById('cam-status').innerText = "Kamera Nonaktif";
+                    document.getElementById('cam-status').classList.replace('text-apple-green', 'text-white');
+                    document.getElementById('scanner-indicator').classList.replace('bg-apple-green', 'bg-red-500');
+                    document.getElementById('scanner-indicator').style.boxShadow = '0 0 10px rgba(239,68,68,0.8)';
+                    
+                    const icon = document.getElementById('icon-cam');
+                    icon.setAttribute('data-lucide', 'camera-off');
+                    lucide.createIcons();
+                }).catch(err => {
+                    console.log("Error stopping scanner", err);
+                });
+            }
+        }
+
+        function toggleCamera() {
+            if(isScanning) stopScanner();
+            else initScanner();
+        }
+
+        // ==========================================
+        // 7. HISTORY RENDERING
+        // ==========================================
+        function renderHistory() {
+            const txs = Storage.getTx();
+            const tbody = document.getElementById('history-table-body');
+            const emptyState = document.getElementById('history-empty');
+
+            if (txs.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            
+            tbody.innerHTML = txs.map(tx => {
+                const date = new Date(tx.timestamp);
+                const dateStr = date.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+                const timeStr = date.toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+                
+                const isSuccess = tx.status === 'SUCCESS';
+                const badgeClass = isSuccess ? 'bg-green-500/10 text-apple-green border-green-500/20' : 'bg-red-500/10 text-apple-red border-red-500/20';
+                const statusText = isSuccess ? 'Sukses' : 'Ditolak';
+
+                return `
+                <tr class="hover:bg-white/5 transition-colors group">
+                    <td class="py-4 px-6 border-b border-white/5">
+                        <span class="font-bold text-white uppercase text-base">${tx.code}</span>
+                    </td>
+                    <td class="py-4 px-6 border-b border-white/5">
+                        <div class="flex flex-col">
+                            <span class="text-white text-sm">${dateStr}</span>
+                            <span class="text-apple-gray text-xs">${timeStr}</span>
+                        </div>
+                    </td>
+                    <td class="py-4 px-6 border-b border-white/5">
+                        <span class="px-3 py-1 text-xs font-semibold rounded-full border ${badgeClass}">
+                            ${statusText}
+                        </span>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function clearHistory() {
+            if(confirm("Apakah Anda yakin ingin menghapus seluruh data histori?")) {
+                Storage.clearTx();
+                showToast('Histori Dihapus', 'Semua catatan transaksi telah dibersihkan', 'success');
+            }
+        }
+
+        // ==========================================
+        // 8. INITIALIZATION
+        // ==========================================
+        window.onload = () => {
+            // Initialize Lucide Icons
+            lucide.createIcons();
+            
+            // Unlock AudioContext on first interaction for Safari compatibility
+            document.body.addEventListener('click', () => {
+                AudioFX.init();
+            }, { once: true });
+
+            // Render Initial Data
+            updateDashboard();
+            renderHistory();
+        };
+
+    </script>
+</body>
+</html>
